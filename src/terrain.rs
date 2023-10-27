@@ -23,7 +23,6 @@ pub struct TerrainConfig {
     pub seed: u64,
     pub radius: f32,
     pub num_cities: u32,
-    pub num_regions: u32,
 }
 
 /// General-purpose state used for terrain generation that is derived from the config.

@@ -41,7 +41,6 @@ fn model(app: &App) -> Model {
         seed: random(),
         radius: 10.0,
         num_cities: 5,
-        num_regions: 5,
     };
 
     let terrain = generate_terrain(config);

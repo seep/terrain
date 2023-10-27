@@ -1,5 +1,3 @@
-use itertools::Itertools;
-use nannou::color::IntoLinSrgba;
 use std::time::Instant;
 
 use nannou::glam::*;
@@ -10,7 +8,6 @@ mod regions;
 mod terrain;
 mod util;
 
-use crate::terrain::terrain_mesh::{TerrainPolygon, TerrainSurface};
 use regions::*;
 use terrain::*;
 use util::*;
@@ -63,7 +60,8 @@ enum DrawingMode {
     DebugFlow,
     DebugErosion,
     DebugRivers,
-    DebugCityScore,
+    DebugCities,
+    DebugRegions,
     Render,
 }
 
@@ -76,8 +74,9 @@ fn cycle_drawing_mode(mode: DrawingMode) -> DrawingMode {
         DrawingMode::DebugSlope => DrawingMode::DebugFlow,
         DrawingMode::DebugFlow => DrawingMode::DebugErosion,
         DrawingMode::DebugErosion => DrawingMode::DebugRivers,
-        DrawingMode::DebugRivers => DrawingMode::DebugCityScore,
-        DrawingMode::DebugCityScore => DrawingMode::Render,
+        DrawingMode::DebugRivers => DrawingMode::DebugCities,
+        DrawingMode::DebugCities => DrawingMode::DebugRegions,
+        DrawingMode::DebugRegions => DrawingMode::Render,
         DrawingMode::Render => DrawingMode::DebugMesh,
     }
 }
@@ -141,14 +140,18 @@ fn view(app: &App, model: &Model, frame: Frame) {
             debug_mesh_surface(&draw, &model.terrain);
             debug_rivers(&draw, &model.terrain);
         }
-        DrawingMode::DebugCityScore => {
-            debug_elevation(&draw, &model.terrain);
-            debug_cities(&draw, &model.terrain, &model.regions);
+        DrawingMode::DebugCities => {
+            debug_habitability(&draw, &model.terrain, &model.regions);
+            render_cities(&draw, &model.terrain, &model.regions);
+        }
+        DrawingMode::DebugRegions => {
+            render_terrain(&draw, &model.terrain);
+            debug_regions(&draw, &model.terrain, &model.regions);
+            render_cities(&draw, &model.terrain, &model.regions);
         }
         DrawingMode::Render => {
-            render_coastline(&draw, &model.terrain);
-            render_rivers(&draw, &model.terrain);
-            render_slopes(&draw, &model.terrain);
+            render_terrain(&draw, &model.terrain);
+            render_cities(&draw, &model.terrain, &model.regions);
         }
     }
 
@@ -206,9 +209,11 @@ fn debug_mesh_polygons(draw: &Draw, terrain: &Terrain) {
 #[allow(dead_code)]
 fn debug_elevation(draw: &Draw, terrain: &Terrain) {
     for (i, poly) in terrain.mesh.polygons.iter().flatten().enumerate() {
+        let p = poly.points.iter().cloned();
         let t = map_clamp(terrain.mesh.elevation[i], -500.0, 500.0, 0.0, 1.0);
-        let c = colorous::COOL.eval_continuous(t as f64);
-        draw_polygon(draw, poly, c.as_tuple());
+        let c = colorous::COOL.eval_continuous(t as f64).into_rgb();
+
+        draw.polygon().points(p).color(c);
     }
 }
 
@@ -253,53 +258,53 @@ fn debug_flow(draw: &Draw, terrain: &Terrain) {
 #[allow(dead_code)]
 fn debug_erosion(draw: &Draw, terrain: &Terrain) {
     for (i, e) in terrain.data.erosion.iter().enumerate() {
-        let vertex = terrain.graph.vertices[i];
-        let radius = map_clamp(*e, 0.0, 2.0, 0.0, 10.0);
-
+        let p = terrain.graph.vertices[i];
+        let r = map_clamp(*e, 0.0, 2.0, 0.0, 10.0);
         let t = map_clamp(*e, 0.0, 2.0, 0.0, 1.0);
-        let c = colorous::MAGMA.eval_continuous(t as f64);
-        let c = Rgb::from(c.as_tuple());
+        let c = colorous::MAGMA.eval_continuous(t as f64).into_rgb();
 
-        draw.ellipse().xy(vertex).radius(radius).color(c);
+        draw.ellipse().xy(p).radius(r).color(c);
     }
 }
 
 #[allow(dead_code)]
 fn debug_mesh_surface(draw: &Draw, terrain: &Terrain) {
     for (i, poly) in terrain.mesh.polygons.iter().flatten().enumerate() {
-        let color = match terrain.mesh.surface[i] {
-            TerrainSurface::Water => (0, 0, 0),
-            TerrainSurface::Land => (255, 255, 255),
+        let p = poly.points.iter().cloned();
+        let c = match terrain.mesh.surface[i] {
+            TerrainSurface::Water => rgb8(0, 0, 0),
+            TerrainSurface::Land => rgb8(255, 255, 255),
         };
 
-        draw_polygon(draw, poly, color);
+        draw.polygon().points(p).color(c);
     }
 }
 
 #[allow(dead_code)]
 fn debug_rivers(draw: &Draw, terrain: &Terrain) {
-    for (i, r) in terrain.mesh.rivers.iter().enumerate() {
-        let t = map_range(i % 8, 0, 8, 0.0, 1.0);
-        let c = colorous::SINEBOW.eval_continuous(t);
-        let c = Rgb::from(c.as_tuple());
-
-        draw.polyline()
-            .color(c)
-            .weight(4.0)
-            .points(r.points.iter().cloned());
+    for (i, river) in terrain.mesh.rivers.iter().enumerate() {
+        let p = river.points.iter().cloned();
+        let c = colorous::SINEBOW.eval_rational(i % 8, 8).into_rgb();
+        draw.polyline().join_round().weight(4.0).points(p).color(c);
     }
 }
 
-fn debug_cities(draw: &Draw, terrain: &Terrain, regions: &Regions) {
-    for (i, poly) in terrain.mesh.polygons.iter().flatten().enumerate() {
-        let t = indexed_mean(&regions.habitability, terrain.graph.cell(i));
-        let c = colorous::MAGMA.eval_continuous(t as f64).as_tuple();
-        draw_polygon(draw, poly, c);
-    }
+#[allow(dead_code)]
+fn debug_habitability(draw: &Draw, terrain: &Terrain, regions: &Regions) {
+    draw.background().color(BLACK);
 
-    for v in regions.cities.iter() {
-        let p = terrain.graph.vertices[*v];
-        draw.ellipse().xy(p).radius(4.0).color(WHITE);
+    for (i, h) in regions.habitability.iter().cloned().enumerate() {
+        let p = terrain.graph.vertices[i];
+        let c = colorous::MAGMA.eval_continuous(h as f64).into_rgb();
+        draw.ellipse().radius(2.0).xy(p).color(c);
+    }
+}
+
+fn debug_regions(draw: &Draw, terrain: &Terrain, regions: &Regions) {
+    for (i, region) in regions.regions.iter().cloned().enumerate() {
+        let p = terrain.graph.vertices[i];
+        let c = colorous::SINEBOW.eval_rational(region % 8, 8).into_rgb();
+        draw.ellipse().radius(2.0).xy(p).color(c);
     }
 }
 
@@ -307,9 +312,18 @@ fn render_coastline(draw: &Draw, terrain: &Terrain) {
     for (a, b) in terrain.mesh.contour.segments.iter().cloned() {
         draw.line()
             .caps_round()
-            .color(BLACK)
             .weight(3.0)
-            .points(a, b);
+            .points(a, b)
+            .color(BLACK);
+    }
+}
+
+fn render_slopes(draw: &Draw, terrain: &Terrain) {
+    for shading in terrain.mesh.shading.iter() {
+        let w = shading.weight;
+        let a = shading.points.0;
+        let b = shading.points.1;
+        draw.line().caps_round().color(BLACK).weight(w).points(a, b);
     }
 }
 
@@ -320,23 +334,27 @@ fn render_rivers(draw: &Draw, terrain: &Terrain) {
 
         draw.polyline()
             .join_round()
-            .color(BLACK)
             .weight(weight)
-            .points(points);
+            .points(points)
+            .color(BLACK);
     }
 }
 
-fn render_slopes(draw: &Draw, terrain: &Terrain) {
-    for shading in terrain.mesh.shading.iter() {
-        let w = shading.weight;
-        let a = shading.points.0;
-        let b = shading.points.1;
-
-        draw.line().caps_round().color(BLACK).weight(w).points(a, b);
-    }
+fn render_terrain(draw: &Draw, terrain: &Terrain) {
+    render_coastline(draw, terrain);
+    render_slopes(draw, terrain);
+    render_rivers(draw, terrain);
 }
 
-fn draw_polygon(draw: &Draw, poly: &TerrainPolygon, color: (u8, u8, u8)) {
-    let points = poly.points.iter().cloned();
-    draw.polygon().points(points).color(Rgb::from(color));
+fn render_cities(draw: &Draw, terrain: &Terrain, regions: &Regions) {
+    for v in regions.cities.iter() {
+        let p = terrain.graph.vertices[*v];
+
+        draw.ellipse()
+            .radius(4.0)
+            .xy(p)
+            .color(WHITE)
+            .stroke_weight(2.0)
+            .stroke_color(BLACK);
+    }
 }

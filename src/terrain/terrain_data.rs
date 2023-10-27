@@ -31,11 +31,9 @@ impl TerrainData {
             add_elevation_slope(&mut elevation, &graph.vertices, feature);
         }
 
-        // TODO sqrt is wayyy to aggressive working in world coords
-
-        // if features.smooth {
-        //     smooth(&mut elevation);
-        // }
+        if features.smooth {
+            smooth(&mut elevation); // TODO sqrt is way too aggressive working in world coords
+        }
 
         if features.relax {
             relax(graph, &mut elevation);

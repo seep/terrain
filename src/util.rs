@@ -26,6 +26,7 @@ pub fn expand_rect(rect: Rect, margin: f32) -> Rect {
     Rect::from_xy_wh(rect.xy(), rect.wh() + 2.0 * margin)
 }
 
+#[allow(dead_code)]
 pub fn max_position(arr: &[f32]) -> Option<usize> {
     if arr.is_empty() {
         return None;

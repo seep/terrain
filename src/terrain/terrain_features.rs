@@ -85,7 +85,7 @@ impl TerrainFeatures {
             });
         }
 
-        let smooth = rand.gen_bool(0.5);
+        let smooth = false;
         let relax = rand.gen_bool(0.5);
         let erode = true;
 

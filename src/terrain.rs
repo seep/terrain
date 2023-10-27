@@ -14,6 +14,7 @@ pub use terrain_features::TerrainFeatures;
 pub use terrain_graph::TerrainGraph;
 pub use terrain_graph::VertexType;
 pub use terrain_mesh::TerrainMesh;
+pub use terrain_mesh::TerrainSurface;
 
 use crate::util::expand_rect;
 

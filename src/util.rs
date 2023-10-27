@@ -1,17 +1,20 @@
 use nannou::geom::*;
 use nannou::math::*;
 
+pub mod ext;
+pub use ext::*;
+
 pub mod path;
 pub use path::*;
 
 pub mod poisson;
 pub use poisson::*;
 
-pub mod voronoi;
-pub use voronoi::*;
-
 pub mod priority_index;
 pub use priority_index::*;
+
+pub mod voronoi;
+pub use voronoi::*;
 
 #[allow(dead_code)]
 pub fn saturate(n: f32) -> f32 {

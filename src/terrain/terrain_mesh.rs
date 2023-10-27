@@ -19,7 +19,7 @@ pub struct TerrainMesh {
 
     /// The elevation of each terrain polygon, as the mean of its vertices.
     pub elevation: Vec<f32>,
-
+    /// The surface type of each terrain polygon.
     pub surface: Vec<TerrainSurface>,
 }
 
